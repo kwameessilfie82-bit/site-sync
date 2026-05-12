@@ -3,8 +3,28 @@ import { embedOne } from "@/lib/supabase/embed";
 import { supervisorClockIn, supervisorClockOut } from "@/actions/attendance";
 import { Button } from "@/ui/primitives/button";
 import { Label } from "@/ui/primitives/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/ui/primitives/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/ui/primitives/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/ui/primitives/empty";
 import { NativeSelect, NativeSelectOption } from "@/ui/primitives/native-select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/ui/primitives/table";
 
 export default async function LiveAttendancePage() {
   const supabase = await createClient();
@@ -50,10 +70,12 @@ export default async function LiveAttendancePage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Live on site</h1>
-        <p className="text-sm text-muted-foreground">Open sessions (not yet clocked out).</p>
-      </div>
+      <Card className="border-border/80 shadow-sm">
+        <CardHeader>
+          <CardTitle className="font-heading text-2xl tracking-tight">Live on site</CardTitle>
+          <CardDescription>Open sessions (not yet clocked out).</CardDescription>
+        </CardHeader>
+      </Card>
 
       {canSupervise && (
         <Card>
@@ -95,42 +117,68 @@ export default async function LiveAttendancePage() {
         </Card>
       )}
 
-      <ul className="divide-y rounded-xl border">
-        {(open ?? []).map((s) => {
-          const person = embedOne(
-            s.person as unknown as { full_name: string } | { full_name: string }[] | null,
-          );
-          const site = embedOne(
-            s.site as unknown as {
-              name: string;
-              project: { name: string } | { name: string }[] | null;
-            } | null,
-          );
-          const proj = embedOne(site?.project ?? null)?.name;
-          return (
-            <li key={s.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-              <div>
-                <div className="font-medium">{person?.full_name ?? "—"}</div>
-                <p className="text-xs text-muted-foreground">
-                  {proj ? `${proj} — ${site?.name}` : (site?.name ?? "—")} · since{" "}
-                  {new Date(s.clock_in_at).toLocaleString()}
-                </p>
-              </div>
-              {canSupervise && (
-                <form action={supervisorClockOut}>
-                  <input type="hidden" name="session_id" value={s.id} />
-                  <Button type="submit" size="sm" variant="outline">
-                    Clock out
-                  </Button>
-                </form>
-              )}
-            </li>
-          );
-        })}
-        {open?.length === 0 && (
-          <li className="px-4 py-8 text-center text-sm text-muted-foreground">Nobody clocked in.</li>
-        )}
-      </ul>
+      {open && open.length > 0 ? (
+        <Card className="overflow-hidden border-border/80 shadow-sm">
+          <CardHeader className="border-b bg-muted/20">
+            <CardTitle className="text-base">Open sessions</CardTitle>
+            <CardDescription>Workers currently clocked in.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50 hover:bg-muted/50">
+                  <TableHead>Person</TableHead>
+                  <TableHead>Site</TableHead>
+                  <TableHead>Since</TableHead>
+                  {canSupervise && <TableHead className="text-right">Actions</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(open ?? []).map((s) => {
+                  const person = embedOne(
+                    s.person as unknown as { full_name: string } | { full_name: string }[] | null,
+                  );
+                  const site = embedOne(
+                    s.site as unknown as {
+                      name: string;
+                      project: { name: string } | { name: string }[] | null;
+                    } | null,
+                  );
+                  const proj = embedOne(site?.project ?? null)?.name;
+                  return (
+                    <TableRow key={s.id}>
+                      <TableCell className="font-medium">{person?.full_name ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {proj ? `${proj} — ${site?.name}` : site?.name ?? "—"}
+                      </TableCell>
+                      <TableCell className="tabular-nums text-muted-foreground">
+                        {new Date(s.clock_in_at).toLocaleString()}
+                      </TableCell>
+                      {canSupervise && (
+                        <TableCell className="text-right">
+                          <form action={supervisorClockOut} className="inline">
+                            <input type="hidden" name="session_id" value={s.id} />
+                            <Button type="submit" size="sm" variant="outline">
+                              Clock out
+                            </Button>
+                          </form>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : (
+        <Empty className="border border-dashed bg-muted/20">
+          <EmptyHeader>
+            <EmptyTitle>Nobody clocked in</EmptyTitle>
+            <EmptyDescription>Open attendance sessions will appear here in real time.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
     </div>
   );
 }

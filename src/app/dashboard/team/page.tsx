@@ -3,7 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import { linkProfileToPerson } from "@/actions/people";
 import { Button } from "@/ui/primitives/button";
 import { Label } from "@/ui/primitives/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/ui/primitives/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/ui/primitives/card";
 import { NativeSelect, NativeSelectOption } from "@/ui/primitives/native-select";
 
 export default async function TeamPage() {
@@ -36,12 +42,14 @@ export default async function TeamPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Team accounts</h1>
-        <p className="text-sm text-muted-foreground">
-          Link each login to a person record so workers can use Check in / out for themselves.
-        </p>
-      </div>
+      <Card className="border-border/80 shadow-sm">
+        <CardHeader>
+          <CardTitle className="font-heading text-2xl tracking-tight">Team accounts</CardTitle>
+          <CardDescription>
+            Link each login to a person record so workers can use Check in / out for themselves.
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
       <ul className="space-y-4">
         {(profiles ?? []).map((p) => (

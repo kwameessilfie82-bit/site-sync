@@ -4,8 +4,28 @@ import { createRosterAssignment } from "@/actions/roster";
 import { Button } from "@/ui/primitives/button";
 import { Input } from "@/ui/primitives/input";
 import { Label } from "@/ui/primitives/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/ui/primitives/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/ui/primitives/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/ui/primitives/empty";
 import { NativeSelect, NativeSelectOption } from "@/ui/primitives/native-select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/ui/primitives/table";
 
 export default async function RosterPage() {
   const supabase = await createClient();
@@ -46,12 +66,14 @@ export default async function RosterPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Roster</h1>
-        <p className="text-sm text-muted-foreground">
-          Who is authorized on which project over a date range (planning vs attendance).
-        </p>
-      </div>
+      <Card className="border-border/80 shadow-sm">
+        <CardHeader>
+          <CardTitle className="font-heading text-2xl tracking-tight">Roster</CardTitle>
+          <CardDescription>
+            Who is authorized on which project over a date range (planning vs attendance).
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
       {canManage && (
         <Card>
@@ -96,29 +118,53 @@ export default async function RosterPage() {
         </Card>
       )}
 
-      <ul className="divide-y rounded-xl border">
-        {(assignments ?? []).map((a) => {
-          const person = embedOne(
-            a.person as unknown as { full_name: string } | { full_name: string }[] | null,
-          );
-          const project = embedOne(
-            a.project as unknown as { name: string } | { name: string }[] | null,
-          );
-          return (
-            <li key={a.id} className="px-4 py-3 text-sm">
-              <span className="font-medium">{person?.full_name ?? "—"}</span>
-              <span className="text-muted-foreground"> → {project?.name ?? "—"}</span>
-              <p className="text-xs text-muted-foreground">
-                {a.valid_from}
-                {a.valid_to ? ` – ${a.valid_to}` : " · open-ended"}
-              </p>
-            </li>
-          );
-        })}
-        {assignments?.length === 0 && (
-          <li className="px-4 py-8 text-center text-sm text-muted-foreground">No roster rows yet.</li>
-        )}
-      </ul>
+      {assignments && assignments.length > 0 ? (
+        <Card className="overflow-hidden border-border/80 shadow-sm">
+          <CardHeader className="border-b bg-muted/20">
+            <CardTitle className="text-base">Assignments</CardTitle>
+            <CardDescription>Recent roster rows (latest 100).</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50 hover:bg-muted/50">
+                  <TableHead>Person</TableHead>
+                  <TableHead>Project</TableHead>
+                  <TableHead>Valid from</TableHead>
+                  <TableHead>Valid to</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {assignments.map((a) => {
+                  const person = embedOne(
+                    a.person as unknown as { full_name: string } | { full_name: string }[] | null,
+                  );
+                  const project = embedOne(
+                    a.project as unknown as { name: string } | { name: string }[] | null,
+                  );
+                  return (
+                    <TableRow key={a.id}>
+                      <TableCell className="font-medium">{person?.full_name ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">{project?.name ?? "—"}</TableCell>
+                      <TableCell className="tabular-nums text-muted-foreground">{a.valid_from}</TableCell>
+                      <TableCell className="tabular-nums text-muted-foreground">
+                        {a.valid_to ?? "—"}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : (
+        <Empty className="border border-dashed bg-muted/20">
+          <EmptyHeader>
+            <EmptyTitle>No roster rows yet</EmptyTitle>
+            <EmptyDescription>Add assignments above to plan who belongs on each project.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
     </div>
   );
 }

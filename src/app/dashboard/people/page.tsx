@@ -3,7 +3,7 @@ import { createPerson } from "@/actions/people";
 import { Button } from "@/ui/primitives/button";
 import { Input } from "@/ui/primitives/input";
 import { Label } from "@/ui/primitives/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/ui/primitives/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/primitives/card";
 import { Badge } from "@/ui/primitives/badge";
 import {
   Table,
@@ -44,12 +44,14 @@ export default async function PeoplePage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">People</h1>
-        <p className="text-sm text-muted-foreground">
-          Field workers and technician IDs for QC alignment. Link accounts under Team.
-        </p>
-      </div>
+      <Card className="border-border/80 shadow-sm">
+        <CardHeader>
+          <CardTitle className="font-heading text-2xl tracking-tight">People</CardTitle>
+          <CardDescription>
+            Field workers and technician IDs for QC alignment. Link accounts under Team.
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
       {canManage && (
         <Card>

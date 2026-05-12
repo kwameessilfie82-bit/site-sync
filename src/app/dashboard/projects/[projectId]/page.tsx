@@ -3,9 +3,31 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createSite } from "@/actions/sites";
 import { Button } from "@/ui/primitives/button";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/ui/primitives/breadcrumb";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/ui/primitives/card";
 import { Input } from "@/ui/primitives/input";
 import { Label } from "@/ui/primitives/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/ui/primitives/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/ui/primitives/empty";
+import { Separator } from "@/ui/primitives/separator";
 
 type Props = { params: Promise<{ projectId: string }> };
 
@@ -54,25 +76,37 @@ export default async function ProjectDetailPage({ params }: Props) {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="space-y-4">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/dashboard/projects">Projects</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{project.name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
         <div>
-          <p className="text-sm text-muted-foreground">
-            <Link href="/dashboard/projects" className="hover:underline">
-              Projects
-            </Link>
-            <span className="mx-1">/</span>
-          </p>
-          <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
+          <h1 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
+            {project.name}
+          </h1>
           {project.client_name && (
-            <p className="text-sm text-muted-foreground">Client: {project.client_name}</p>
+            <p className="mt-1 text-sm text-muted-foreground">Client: {project.client_name}</p>
           )}
         </div>
       </div>
 
       {canManage && (
-        <Card>
+        <Card className="border-border/80 shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Add site</CardTitle>
+            <CardDescription>
+              Geocoordinates and radius unlock GPS validation at clock-in.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form action={createSite} className="grid gap-4 sm:grid-cols-2">
@@ -101,35 +135,49 @@ export default async function ProjectDetailPage({ params }: Props) {
         </Card>
       )}
 
-      <div>
-        <h2 className="mb-3 text-lg font-medium">Sites</h2>
-        <ul className="space-y-3">
-          {(sites ?? []).map((s) => {
-            const tok = tokenBySite.get(s.id);
-            const checkInUrl = tok
-              ? `${origin}/dashboard/check-in?site=${s.id}&token=${encodeURIComponent(tok.token)}`
-              : `${origin}/dashboard/check-in?site=${s.id}`;
-            return (
-              <li key={s.id} className="rounded-xl border p-4">
-                <div className="font-medium">{s.name}</div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {s.latitude != null && s.longitude != null
-                    ? `${s.latitude}, ${s.longitude}`
-                    : "No map pin"}
-                  {s.geofence_radius_m != null ? ` · ${s.geofence_radius_m}m geofence` : ""}
-                </p>
-                {tok && (
-                  <p className="mt-2 break-all text-xs font-mono text-muted-foreground">
-                    Check-in URL: {checkInUrl}
-                  </p>
-                )}
-              </li>
-            );
-          })}
-          {sites?.length === 0 && (
-            <p className="text-sm text-muted-foreground">No sites yet. Add one above.</p>
-          )}
-        </ul>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-lg font-semibold tracking-tight">Sites</h2>
+        </div>
+        <Separator />
+        {sites && sites.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            {(sites ?? []).map((s) => {
+              const tok = tokenBySite.get(s.id);
+              const checkInUrl = tok
+                ? `${origin}/dashboard/check-in?site=${s.id}&token=${encodeURIComponent(tok.token)}`
+                : `${origin}/dashboard/check-in?site=${s.id}`;
+              return (
+                <Card key={s.id} className="border-border/80 shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="text-base">{s.name}</CardTitle>
+                    <CardDescription>
+                      {s.latitude != null && s.longitude != null
+                        ? `${s.latitude}, ${s.longitude}`
+                        : "No map pin"}
+                      {s.geofence_radius_m != null ? ` · ${s.geofence_radius_m}m geofence` : ""}
+                    </CardDescription>
+                  </CardHeader>
+                  {tok && (
+                    <CardFooter className="flex flex-col items-start gap-1 border-t bg-muted/30">
+                      <span className="text-xs font-medium text-muted-foreground">Check-in URL</span>
+                      <p className="break-all text-xs font-mono leading-relaxed text-muted-foreground">
+                        {checkInUrl}
+                      </p>
+                    </CardFooter>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        ) : (
+          <Empty className="border border-dashed bg-muted/20">
+            <EmptyHeader>
+              <EmptyTitle>No sites yet</EmptyTitle>
+              <EmptyDescription>Add a site above to generate check-in links and geofences.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        )}
       </div>
     </div>
   );

@@ -4,8 +4,28 @@ import { createAsset, checkoutAsset, checkinAsset } from "@/actions/assets";
 import { Button } from "@/ui/primitives/button";
 import { Input } from "@/ui/primitives/input";
 import { Label } from "@/ui/primitives/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/ui/primitives/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/ui/primitives/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/ui/primitives/empty";
 import { NativeSelect, NativeSelectOption } from "@/ui/primitives/native-select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/ui/primitives/table";
 
 export default async function AssetsPage() {
   const supabase = await createClient();
@@ -45,10 +65,12 @@ export default async function AssetsPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Assets</h1>
-        <p className="text-sm text-muted-foreground">Tool checkout for basic accountability.</p>
-      </div>
+      <Card className="border-border/80 shadow-sm">
+        <CardHeader>
+          <CardTitle className="font-heading text-2xl tracking-tight">Assets</CardTitle>
+          <CardDescription>Tool checkout for basic accountability.</CardDescription>
+        </CardHeader>
+      </Card>
 
       {canManage && (
         <Card>
@@ -112,39 +134,62 @@ export default async function AssetsPage() {
         </Card>
       )}
 
-      <div>
-        <h2 className="mb-2 text-lg font-medium">Currently checked out</h2>
-        <ul className="divide-y rounded-xl border">
-          {(checkouts ?? []).map((c) => {
-            const asset = embedOne(c.asset as unknown as { name: string } | { name: string }[] | null);
-            const person = embedOne(
-              c.person as unknown as { full_name: string } | { full_name: string }[] | null,
-            );
-            return (
-              <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                <div>
-                  <span className="font-medium">{asset?.name ?? "—"}</span>
-                  <span className="text-muted-foreground"> → {person?.full_name ?? "—"}</span>
-                  <p className="text-xs text-muted-foreground">
-                    since {new Date(c.checked_out_at).toLocaleString()}
-                  </p>
-                </div>
-                {canManage && (
-                  <form action={checkinAsset}>
-                    <input type="hidden" name="checkout_id" value={c.id} />
-                    <Button type="submit" size="sm" variant="outline">
-                      Check in
-                    </Button>
-                  </form>
-                )}
-              </li>
-            );
-          })}
-          {checkouts?.length === 0 && (
-            <li className="px-4 py-8 text-center text-sm text-muted-foreground">Nothing checked out.</li>
-          )}
-        </ul>
-      </div>
+      {checkouts && checkouts.length > 0 ? (
+        <Card className="overflow-hidden border-border/80 shadow-sm">
+          <CardHeader className="border-b bg-muted/20">
+            <CardTitle className="text-base">Currently checked out</CardTitle>
+            <CardDescription>Active checkouts across your org.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50 hover:bg-muted/50">
+                  <TableHead>Asset</TableHead>
+                  <TableHead>Person</TableHead>
+                  <TableHead>Since</TableHead>
+                  {canManage && <TableHead className="text-right">Actions</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(checkouts ?? []).map((c) => {
+                  const asset = embedOne(
+                    c.asset as unknown as { name: string } | { name: string }[] | null,
+                  );
+                  const person = embedOne(
+                    c.person as unknown as { full_name: string } | { full_name: string }[] | null,
+                  );
+                  return (
+                    <TableRow key={c.id}>
+                      <TableCell className="font-medium">{asset?.name ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">{person?.full_name ?? "—"}</TableCell>
+                      <TableCell className="tabular-nums text-muted-foreground">
+                        {new Date(c.checked_out_at).toLocaleString()}
+                      </TableCell>
+                      {canManage && (
+                        <TableCell className="text-right">
+                          <form action={checkinAsset} className="inline">
+                            <input type="hidden" name="checkout_id" value={c.id} />
+                            <Button type="submit" size="sm" variant="outline">
+                              Check in
+                            </Button>
+                          </form>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : (
+        <Empty className="border border-dashed bg-muted/20">
+          <EmptyHeader>
+            <EmptyTitle>Nothing checked out</EmptyTitle>
+            <EmptyDescription>Equipment checkouts will show here when crews borrow assets.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
     </div>
   );
 }

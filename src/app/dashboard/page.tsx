@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/ui/primitives/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/ui/primitives/card";
 import { Button } from "@/ui/primitives/button";
 import { Badge } from "@/ui/primitives/badge";
 import { Progress } from "@/ui/primitives/progress";
@@ -35,15 +41,17 @@ export default async function DashboardHomePage() {
 
   return (
     <div className="space-y-8">
-      <div className="rounded-2xl border bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6">
-        <Badge variant="secondary" className="mb-3">
-          Operations Dashboard
-        </Badge>
-        <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Live snapshot of projects, workforce coverage, and accountability status.
-        </p>
-      </div>
+      <Card className="overflow-hidden border-border/80 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent shadow-sm dark:from-primary/25 dark:via-primary/10">
+        <CardHeader className="gap-3">
+          <Badge variant="secondary" className="w-fit shadow-none">
+            Operations Dashboard
+          </Badge>
+          <CardTitle className="font-heading text-2xl tracking-tight md:text-3xl">Overview</CardTitle>
+          <CardDescription className="text-base">
+            Live snapshot of projects, workforce coverage, and accountability status.
+          </CardDescription>
+        </CardHeader>
+      </Card>
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
