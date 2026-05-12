@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import { LoginForm } from "@/app/login/login-form";
+import { LoginSignupLink } from "@/app/login/login-signup-link";
 import { AuthTopBar } from "@/components/public-chrome";
 import {
   Card,
@@ -36,15 +36,16 @@ export default function LoginPage() {
             </Suspense>
           </CardContent>
           <CardFooter className="flex justify-center border-t">
-            <p className="text-center text-sm text-muted-foreground">
-              No account?{" "}
-              <Link
-                href="/signup"
-                className="font-medium text-foreground underline-offset-4 hover:underline"
-              >
-                Sign up
-              </Link>
-            </p>
+            <Suspense
+              fallback={
+                <p className="text-center text-sm text-muted-foreground">
+                  No account?{" "}
+                  <span className="font-medium text-foreground">Sign up</span>
+                </p>
+              }
+            >
+              <LoginSignupLink />
+            </Suspense>
           </CardFooter>
         </Card>
       </div>

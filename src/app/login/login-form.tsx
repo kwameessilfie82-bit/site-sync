@@ -11,7 +11,12 @@ import { toast } from "sonner";
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") ?? "/dashboard";
+  const invite = searchParams.get("invite")?.trim();
+  const nextDefault =
+    invite && invite.length >= 8
+      ? `/onboarding?invite=${encodeURIComponent(invite)}`
+      : "/dashboard";
+  const next = searchParams.get("next") ?? nextDefault;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);

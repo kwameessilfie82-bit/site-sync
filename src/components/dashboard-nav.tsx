@@ -12,6 +12,7 @@ import {
   Package,
   ScrollText,
   CalendarRange,
+  MailPlus,
 } from "lucide-react";
 
 export type DashboardNavItem = {
@@ -25,6 +26,7 @@ const allItems: DashboardNavItem[] = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/projects", label: "Projects", icon: FolderKanban },
   { href: "/dashboard/people", label: "People", icon: Users },
+  { href: "/dashboard/invites", label: "Invites", icon: MailPlus, roles: ["owner", "pm", "supervisor"] },
   { href: "/dashboard/team", label: "Team accounts", icon: UserCog, roles: ["owner", "pm"] },
   { href: "/dashboard/roster", label: "Roster", icon: CalendarRange },
   { href: "/dashboard/check-in", label: "Check in / out", icon: LogIn },

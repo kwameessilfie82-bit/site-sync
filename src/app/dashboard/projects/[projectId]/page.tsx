@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { createSite } from "@/actions/sites";
-import { Button } from "@/ui/primitives/button";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -19,8 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/ui/primitives/card";
-import { Input } from "@/ui/primitives/input";
-import { Label } from "@/ui/primitives/label";
+import { AddSiteForm } from "@/components/add-site-form";
 import {
   Empty,
   EmptyDescription,
@@ -105,32 +102,12 @@ export default async function ProjectDetailPage({ params }: Props) {
           <CardHeader>
             <CardTitle className="text-base">Add site</CardTitle>
             <CardDescription>
-              Geocoordinates and radius unlock GPS validation at clock-in.
+              Pick the location on the map (default). Optionally set a geofence radius — the circle previews on the
+              map. Use decimal coordinates only if you prefer typing them.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form action={createSite} className="grid gap-4 sm:grid-cols-2">
-              <input type="hidden" name="project_id" value={projectId} />
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="name">Site name</Label>
-                <Input id="name" name="name" required placeholder="Main laydown / Gate A" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="latitude">Latitude (optional)</Label>
-                <Input id="latitude" name="latitude" placeholder="0.3476" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="longitude">Longitude (optional)</Label>
-                <Input id="longitude" name="longitude" placeholder="32.5825" />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="geofence_radius_m">Geofence radius (m, optional)</Label>
-                <Input id="geofence_radius_m" name="geofence_radius_m" placeholder="200" />
-              </div>
-              <div className="sm:col-span-2">
-                <Button type="submit">Create site & check-in link</Button>
-              </div>
-            </form>
+            <AddSiteForm projectId={projectId} />
           </CardContent>
         </Card>
       )}
