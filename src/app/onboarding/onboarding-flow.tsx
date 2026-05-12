@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState, useTransition } from "react";
+import { Suspense, useEffect, useRef, useState, useTransition } from "react";
 import { OnboardingForm } from "@/app/onboarding/onboarding-form";
 import { acceptOrganizationInvite } from "@/actions/invites";
 import { Button } from "@/ui/primitives/button";
@@ -15,6 +15,7 @@ import {
 import { Input } from "@/ui/primitives/input";
 import { Label } from "@/ui/primitives/label";
 import { Separator } from "@/ui/primitives/separator";
+import { Spinner } from "@/ui/primitives/spinner";
 import { toast } from "sonner";
 
 function OnboardingFlowInner() {
@@ -25,6 +26,30 @@ function OnboardingFlowInner() {
   const [mode, setMode] = useState<"join" | "create">(inviteFromUrl ? "join" : "create");
   const [inviteCode, setInviteCode] = useState(inviteFromUrl);
   const [pending, start] = useTransition();
+  /** After auto-accept from URL fails, show manual form with code prefilled */
+  const [inviteUrlFailed, setInviteUrlFailed] = useState(false);
+  const autoAcceptStarted = useRef(false);
+
+  const shouldAutoAcceptFromUrl = inviteFromUrl.length >= 8 && !inviteUrlFailed;
+
+  useEffect(() => {
+    if (!shouldAutoAcceptFromUrl) return;
+    if (autoAcceptStarted.current) return;
+    autoAcceptStarted.current = true;
+
+    start(async () => {
+      const res = await acceptOrganizationInvite(inviteFromUrl);
+      if ("error" in res) {
+        toast.error(res.error);
+        setInviteUrlFailed(true);
+        autoAcceptStarted.current = false;
+        return;
+      }
+      toast.success("You have joined the organization.");
+      router.replace("/dashboard");
+      router.refresh();
+    });
+  }, [shouldAutoAcceptFromUrl, inviteFromUrl, router]);
 
   function onAcceptInvite(e: React.FormEvent) {
     e.preventDefault();
@@ -40,10 +65,13 @@ function OnboardingFlowInner() {
         return;
       }
       toast.success("You have joined the organization.");
-      router.push("/dashboard");
+      router.replace("/dashboard");
       router.refresh();
     });
   }
+
+  const showManualJoinForm =
+    mode === "join" && (!shouldAutoAcceptFromUrl || inviteUrlFailed);
 
   return (
     <>
@@ -53,12 +81,21 @@ function OnboardingFlowInner() {
         </CardTitle>
         <CardDescription>
           {mode === "join"
-            ? "Paste the invite code from your team lead, then accept to enter the workspace."
+            ? shouldAutoAcceptFromUrl && !inviteUrlFailed
+              ? "Hang on — we’re applying your invite from the link you used."
+              : "Enter the invite code from your team if it wasn’t applied automatically."
             : "This becomes the tenant for all projects, people, and attendance. You will be the owner."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {mode === "join" ? (
+        {mode === "join" && shouldAutoAcceptFromUrl && !inviteUrlFailed ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-10">
+            <Spinner className="size-8" />
+            <p className="text-sm text-muted-foreground">Joining your workspace…</p>
+          </div>
+        ) : null}
+
+        {showManualJoinForm ? (
           <form onSubmit={onAcceptInvite} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="invite-code">Invite code</Label>
@@ -85,7 +122,9 @@ function OnboardingFlowInner() {
               </button>
             </p>
           </form>
-        ) : (
+        ) : null}
+
+        {mode === "create" ? (
           <div className="space-y-6">
             <OnboardingForm />
             <Separator />
@@ -94,13 +133,17 @@ function OnboardingFlowInner() {
               <button
                 type="button"
                 className="font-medium text-foreground underline-offset-4 hover:underline"
-                onClick={() => setMode("join")}
+                onClick={() => {
+                  setMode("join");
+                  setInviteUrlFailed(true);
+                }}
               >
                 Join with an invite code
               </button>
             </p>
           </div>
-        )}
+        ) : null}
+
         <p className="text-center text-xs text-muted-foreground">
           <Link href="/login" className="underline-offset-4 hover:underline">
             Back to sign in

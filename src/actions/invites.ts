@@ -54,13 +54,34 @@ export async function acceptOrganizationInvite(token: string) {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not signed in." };
 
+  const { data: existing } = await supabase
+    .from("profiles")
+    .select("org_id")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (existing?.org_id) {
+    revalidatePath("/", "layout");
+    revalidatePath("/dashboard/people");
+    return { ok: true as const };
+  }
+
   const { error } = await supabase.rpc("accept_organization_invite", {
     p_token: trimmed,
   });
 
-  if (error) return { error: error.message };
+  if (error) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes("already belongs")) {
+      revalidatePath("/", "layout");
+      revalidatePath("/dashboard/people");
+      return { ok: true as const };
+    }
+    return { error: error.message };
+  }
 
   revalidatePath("/", "layout");
+  revalidatePath("/dashboard/people");
   return { ok: true as const };
 }
 

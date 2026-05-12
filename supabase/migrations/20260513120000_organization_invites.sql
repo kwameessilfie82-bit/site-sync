@@ -63,7 +63,8 @@ begin
     raise exception 'Not allowed to create invites';
   end if;
 
-  new_token := encode(gen_random_bytes(18), 'hex');
+  -- Use UUIDs only (built into PostgreSQL 13+). gen_random_bytes() needs pgcrypto and may be missing.
+  new_token := replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', '');
 
   insert into public.organization_invites (org_id, token, invited_role, invited_by, expires_at)
   values (v_org_id, new_token, p_invited_role, uid, now() + interval '14 days');

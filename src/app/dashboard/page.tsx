@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getRbacSummary } from "@/lib/rbac";
+import type { UserRole } from "@/types/database";
 import {
   Card,
   CardContent,
@@ -20,11 +22,13 @@ export default async function DashboardHomePage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("org_id")
+    .select("org_id, role")
     .eq("id", user!.id)
     .single();
 
   const orgId = profile!.org_id!;
+  const role = profile!.role as UserRole;
+  const rbac = getRbacSummary(role);
 
   const [{ count: projectCount }, { count: peopleCount }, { count: openSessions }] =
     await Promise.all([
@@ -48,7 +52,9 @@ export default async function DashboardHomePage() {
           </Badge>
           <CardTitle className="font-heading text-2xl tracking-tight md:text-3xl">Overview</CardTitle>
           <CardDescription className="text-base">
-            Live snapshot of projects, workforce coverage, and accountability status.
+            {rbac.isWorker
+              ? "Your org snapshot — use the sidebar for check-in and your log."
+              : "Live snapshot of projects, workforce coverage, and accountability status."}
           </CardDescription>
         </CardHeader>
       </Card>
@@ -97,21 +103,37 @@ export default async function DashboardHomePage() {
         </CardContent>
       </Card>
       <div className="grid gap-3 md:grid-cols-3">
-        <Button asChild className="justify-between">
-          <Link href="/dashboard/projects">
-            Manage projects <ArrowRight className="size-4" />
-          </Link>
-        </Button>
+        {rbac.canManageProjectsPeopleRoster ? (
+          <Button asChild className="justify-between">
+            <Link href="/dashboard/projects">
+              Manage projects <ArrowRight className="size-4" />
+            </Link>
+          </Button>
+        ) : (
+          <Button asChild variant="outline" className="justify-between">
+            <Link href="/dashboard/attendance">
+              Attendance log <ArrowRight className="size-4" />
+            </Link>
+          </Button>
+        )}
         <Button asChild variant="outline" className="justify-between">
           <Link href="/dashboard/check-in">
             Check in / out <ArrowRight className="size-4" />
           </Link>
         </Button>
-        <Button asChild variant="outline" className="justify-between">
-          <Link href="/dashboard/attendance/live">
-            Live on site <ArrowRight className="size-4" />
-          </Link>
-        </Button>
+        {rbac.canSuperviseFloor ? (
+          <Button asChild variant="outline" className="justify-between">
+            <Link href="/dashboard/attendance/live">
+              Live on site <ArrowRight className="size-4" />
+            </Link>
+          </Button>
+        ) : (
+          <Button asChild variant="outline" className="justify-between">
+            <Link href="/dashboard/incidents">
+              Incidents <ArrowRight className="size-4" />
+            </Link>
+          </Button>
+        )}
       </div>
     </div>
   );

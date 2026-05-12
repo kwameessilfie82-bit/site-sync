@@ -82,8 +82,8 @@ export function SignupForm() {
           </TabsContent>
           <TabsContent value="join" className="mt-0 space-y-3 text-left">
             <p className="text-sm text-muted-foreground">
-              Use the code or link your admin shared. You&apos;ll join with the role they chose (worker,
-              supervisor, or PM).
+              Paste the code once here (or open your invite link — it fills this for you). After you sign up,
+              you&apos;ll be added to the team automatically; you won&apos;t enter the code again.
             </p>
             <div className="space-y-2">
               <Label htmlFor="invite">Invite code</Label>

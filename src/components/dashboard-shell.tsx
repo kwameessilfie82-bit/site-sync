@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 import { Building2, LogIn, LogOut } from "lucide-react";
 import { getDashboardNavItems } from "@/components/dashboard-nav";
+import { DashboardRbacGate } from "@/components/dashboard-rbac-gate";
 import { ThemeToggle } from "@/components/theme-toggle";
 import type { UserRole } from "@/types/database";
 import { Button } from "@/ui/primitives/button";
@@ -148,7 +149,9 @@ export function DashboardShell({
             <ThemeToggle />
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">{children}</div>
+        <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+          <DashboardRbacGate role={role}>{children}</DashboardRbacGate>
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );
