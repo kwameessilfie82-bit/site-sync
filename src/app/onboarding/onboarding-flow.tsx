@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, useTransition } from "react";
 import { OnboardingForm } from "@/app/onboarding/onboarding-form";
 import { acceptOrganizationInvite } from "@/actions/invites";
+import { createClient } from "@/lib/supabase/client";
+import { PENDING_ORG_INVITE_META_KEY } from "@/lib/invite-metadata";
 import { Button } from "@/ui/primitives/button";
 import {
   CardContent,
@@ -21,24 +23,55 @@ import { toast } from "sonner";
 function OnboardingFlowInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const inviteFromUrl = searchParams.get("invite")?.trim() ?? "";
+  const urlInvite = searchParams.get("invite")?.trim() ?? "";
 
-  const [mode, setMode] = useState<"join" | "create">(inviteFromUrl ? "join" : "create");
-  const [inviteCode, setInviteCode] = useState(inviteFromUrl);
+  const [resolution, setResolution] = useState<"pending" | "done">(() =>
+    urlInvite.length >= 8 ? "done" : "pending",
+  );
+  const [metaInvite, setMetaInvite] = useState("");
+  const [mode, setMode] = useState<"join" | "create">(() => (urlInvite.length >= 8 ? "join" : "create"));
+  const [inviteCode, setInviteCode] = useState(urlInvite);
   const [pending, start] = useTransition();
   /** After auto-accept from URL fails, show manual form with code prefilled */
   const [inviteUrlFailed, setInviteUrlFailed] = useState(false);
   const autoAcceptStarted = useRef(false);
 
-  const shouldAutoAcceptFromUrl = inviteFromUrl.length >= 8 && !inviteUrlFailed;
+  useEffect(() => {
+    if (urlInvite.length >= 8) return;
+    let cancelled = false;
+    createClient()
+      .auth.getUser()
+      .then(({ data: { user } }) => {
+        if (cancelled) return;
+        const raw = user?.user_metadata?.[PENDING_ORG_INVITE_META_KEY];
+        const s = typeof raw === "string" ? raw.trim() : "";
+        if (s.length >= 8) {
+          setMetaInvite(s);
+          setInviteCode((prev) => (prev.length >= 8 ? prev : s));
+          setMode("join");
+        }
+        setResolution("done");
+      })
+      .catch(() => {
+        if (!cancelled) setResolution("done");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [urlInvite]);
+
+  const effectiveInvite = urlInvite.length >= 8 ? urlInvite : metaInvite;
+
+  const shouldAutoAccept = effectiveInvite.length >= 8 && !inviteUrlFailed;
 
   useEffect(() => {
-    if (!shouldAutoAcceptFromUrl) return;
+    if (resolution !== "done" && urlInvite.length < 8) return;
+    if (!shouldAutoAccept) return;
     if (autoAcceptStarted.current) return;
     autoAcceptStarted.current = true;
 
     start(async () => {
-      const res = await acceptOrganizationInvite(inviteFromUrl);
+      const res = await acceptOrganizationInvite(effectiveInvite);
       if ("error" in res) {
         toast.error(res.error);
         setInviteUrlFailed(true);
@@ -49,7 +82,7 @@ function OnboardingFlowInner() {
       router.replace("/dashboard");
       router.refresh();
     });
-  }, [shouldAutoAcceptFromUrl, inviteFromUrl, router]);
+  }, [resolution, shouldAutoAccept, effectiveInvite, router, urlInvite.length]);
 
   function onAcceptInvite(e: React.FormEvent) {
     e.preventDefault();
@@ -71,7 +104,22 @@ function OnboardingFlowInner() {
   }
 
   const showManualJoinForm =
-    mode === "join" && (!shouldAutoAcceptFromUrl || inviteUrlFailed);
+    mode === "join" && (!shouldAutoAccept || inviteUrlFailed);
+
+  if (urlInvite.length < 8 && resolution === "pending") {
+    return (
+      <>
+        <CardHeader className="space-y-1 text-center">
+          <CardTitle className="font-heading text-2xl tracking-tight">Set up your workspace</CardTitle>
+          <CardDescription>Checking your account…</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center justify-center gap-3 py-10">
+          <Spinner className="size-8" />
+          <p className="text-sm text-muted-foreground">One moment.</p>
+        </CardContent>
+      </>
+    );
+  }
 
   return (
     <>
@@ -81,14 +129,14 @@ function OnboardingFlowInner() {
         </CardTitle>
         <CardDescription>
           {mode === "join"
-            ? shouldAutoAcceptFromUrl && !inviteUrlFailed
+            ? shouldAutoAccept && !inviteUrlFailed
               ? "Hang on — we’re applying your invite from the link you used."
               : "Enter the invite code from your team if it wasn’t applied automatically."
             : "This becomes the tenant for all projects, people, and attendance. You will be the owner."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {mode === "join" && shouldAutoAcceptFromUrl && !inviteUrlFailed ? (
+        {mode === "join" && shouldAutoAccept && !inviteUrlFailed ? (
           <div className="flex flex-col items-center justify-center gap-3 py-10">
             <Spinner className="size-8" />
             <p className="text-sm text-muted-foreground">Joining your workspace…</p>

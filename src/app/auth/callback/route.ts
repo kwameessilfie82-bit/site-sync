@@ -2,11 +2,19 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
+import { getPublicSiteUrlFromRequest } from "@/lib/site-url";
+
+function safeInternalPath(next: string | null): string {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/dashboard";
+  return next;
+}
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const requestUrl = request.url;
+  const { searchParams } = new URL(requestUrl);
+  const origin = getPublicSiteUrlFromRequest(requestUrl);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/dashboard";
+  const next = safeInternalPath(searchParams.get("next"));
 
   if (code) {
     const cookieStore = await cookies();

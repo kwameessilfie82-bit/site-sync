@@ -2,13 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { updateMyDisplayName } from "@/actions/profile";
+import { updateMyProfile } from "@/actions/profile";
 import { Button } from "@/ui/primitives/button";
 import { Input } from "@/ui/primitives/input";
 import { Label } from "@/ui/primitives/label";
 import { toast } from "sonner";
 
-export function ProfileSettingsForm({ initialDisplayName }: { initialDisplayName: string }) {
+export function ProfileSettingsForm({
+  initialDisplayName,
+  initialPhone,
+}: {
+  initialDisplayName: string;
+  initialPhone: string;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
 
@@ -16,7 +22,7 @@ export function ProfileSettingsForm({ initialDisplayName }: { initialDisplayName
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     start(async () => {
-      const res = await updateMyDisplayName(fd);
+      const res = await updateMyProfile(fd);
       if ("error" in res) {
         toast.error(res.error);
         return;
@@ -38,6 +44,21 @@ export function ProfileSettingsForm({ initialDisplayName }: { initialDisplayName
           defaultValue={initialDisplayName}
           autoComplete="name"
         />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="phone">Phone</Label>
+        <Input
+          id="phone"
+          name="phone"
+          type="tel"
+          maxLength={40}
+          defaultValue={initialPhone}
+          autoComplete="tel"
+          placeholder="Optional"
+        />
+        <p className="text-xs text-muted-foreground">
+          If your login is linked to a person record, this also updates the phone shown in the people directory.
+        </p>
       </div>
       <Button type="submit" disabled={pending}>
         {pending ? "Saving…" : "Save"}

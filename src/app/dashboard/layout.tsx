@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { employeePendingProjectGate } from "@/lib/project-assignment";
 import type { UserRole } from "@/types/database";
 
 export default async function DashboardLayout({
@@ -15,23 +16,35 @@ export default async function DashboardLayout({
 
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
+  const { data: profileBefore } = await supabase
     .from("profiles")
-    .select("display_name, role, org_id")
+    .select("display_name, role, org_id, person_id")
     .eq("id", user.id)
     .single();
 
-  if (!profile?.org_id) redirect("/onboarding");
+  if (!profileBefore?.org_id) redirect("/onboarding");
 
-  const role = profile.role as UserRole;
+  await supabase.rpc("ensure_my_person_record");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("display_name, role, org_id, person_id")
+    .eq("id", user.id)
+    .single();
+
+  const p = profile ?? profileBefore;
+  const role = p.role as UserRole;
+
+  const employeePendingAssignment = await employeePendingProjectGate(supabase, p.role, p.person_id);
+
   const { data: organization } = await supabase
     .from("organizations")
     .select("name")
-    .eq("id", profile.org_id)
+    .eq("id", p.org_id)
     .maybeSingle();
 
   const displayName =
-    profile.display_name?.trim() ||
+    p.display_name?.trim() ||
     user.email?.trim() ||
     (typeof user.user_metadata?.display_name === "string"
       ? user.user_metadata.display_name.trim()
@@ -44,6 +57,7 @@ export default async function DashboardLayout({
       role={role}
       orgName={organization?.name ?? "Organization"}
       displayName={displayName}
+      employeePendingAssignment={employeePendingAssignment}
     >
       {children}
     </DashboardShell>

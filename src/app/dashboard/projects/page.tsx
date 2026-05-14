@@ -48,7 +48,7 @@ export default async function ProjectsPage() {
       <Card className="border-border/80 shadow-sm">
         <CardHeader>
           <CardTitle className="font-heading text-2xl tracking-tight">Projects</CardTitle>
-          <CardDescription>Each project contains one or more sites for check-in.</CardDescription>
+          <CardDescription>Projects organize field log sheets and reporting for your crews.</CardDescription>
         </CardHeader>
       </Card>
 
@@ -125,7 +125,7 @@ export default async function ProjectsPage() {
             </EmptyMedia>
             <EmptyTitle>No projects yet</EmptyTitle>
             <EmptyDescription>
-              Create your first project to start organizing sites and attendance.
+              Create your first project to start defining log sheets and reviewing submissions.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>

@@ -1,5 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
+import { defaultDashboardPath } from "@/lib/dashboard-home";
+import {
+  employeePendingProjectGate,
+  pathAllowedForPendingEmployee,
+} from "@/lib/project-assignment";
+import type { UserRole } from "@/types/database";
 
 function getSupabaseConfig() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -54,14 +60,23 @@ export async function proxy(request: NextRequest) {
 
   if (user && isAuth) {
     const next = request.nextUrl.clone();
-    next.pathname = "/dashboard";
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("org_id, role")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (profile?.org_id) {
+      next.pathname = defaultDashboardPath(profile.role as UserRole);
+    } else {
+      next.pathname = "/onboarding";
+    }
     return NextResponse.redirect(next);
   }
 
   if (user && isDashboard && !isOnboarding) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("org_id")
+      .select("org_id, role, person_id")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -70,18 +85,41 @@ export async function proxy(request: NextRequest) {
       next.pathname = "/onboarding";
       return NextResponse.redirect(next);
     }
+
+    if (profile?.org_id) {
+      if (profile.role === "employee" || profile.role === "worker") {
+        await supabase.rpc("ensure_my_person_record");
+        const { data: gateProfile } = await supabase
+          .from("profiles")
+          .select("org_id, role, person_id")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (
+          gateProfile &&
+          (gateProfile.role === "employee" || gateProfile.role === "worker") &&
+          (await employeePendingProjectGate(supabase, gateProfile.role, gateProfile.person_id)) &&
+          !pathAllowedForPendingEmployee(path)
+        ) {
+          const next = request.nextUrl.clone();
+          next.pathname = "/dashboard/awaiting-project";
+          next.search = "";
+          return NextResponse.redirect(next);
+        }
+      }
+    }
   }
 
   if (user && isOnboarding) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("org_id")
+      .select("org_id, role")
       .eq("id", user.id)
       .maybeSingle();
 
     if (profile?.org_id) {
       const next = request.nextUrl.clone();
-      next.pathname = "/dashboard";
+      next.pathname = defaultDashboardPath(profile.role as UserRole);
       return NextResponse.redirect(next);
     }
   }

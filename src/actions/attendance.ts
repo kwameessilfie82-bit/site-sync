@@ -1,8 +1,10 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { distanceMeters } from "@/lib/geo";
 import { logAudit } from "@/lib/audit";
+import { haversineMeters } from "@/lib/geo";
+import { employeeMayAccessProject } from "@/lib/field-log-access";
+import { isProjectGeofenceColumnError } from "@/lib/project-geofence-error";
 import { revalidatePath } from "next/cache";
 
 export async function clockIn(formData: FormData) {
@@ -22,67 +24,92 @@ export async function clockIn(formData: FormData) {
   if (!profile.person_id) {
     return {
       error:
-        "Your account is not linked to a worker profile. Ask an owner or PM to link you in Team.",
+        "Your account is not linked to an employee profile. Ask an owner or PM to link you in Team.",
     };
   }
 
-  const siteId = String(formData.get("site_id") ?? "");
-  if (!siteId) return { error: "Select a site." };
+  const projectId = String(formData.get("project_id") ?? "").trim();
+  if (!projectId) return { error: "Select a project." };
 
-  const token = String(formData.get("token") ?? "").trim() || null;
   const latRaw = String(formData.get("latitude") ?? "").trim();
   const lngRaw = String(formData.get("longitude") ?? "").trim();
   const latitude = latRaw ? Number(latRaw) : null;
   const longitude = lngRaw ? Number(lngRaw) : null;
 
-  const { data: site, error: siteErr } = await supabase
-    .from("sites")
-    .select("id, latitude, longitude, geofence_radius_m, project_id")
-    .eq("id", siteId)
-    .single();
+  let project = null as {
+    id: string;
+    org_id: string;
+    site_latitude: number | null;
+    site_longitude: number | null;
+    site_radius_m: number | null;
+  } | null;
 
-  if (siteErr || !site) return { error: "Site not found." };
-
-  const { data: siteProject } = await supabase
+  const geoRes = await supabase
     .from("projects")
-    .select("org_id")
-    .eq("id", site.project_id)
+    .select("id, org_id, site_latitude, site_longitude, site_radius_m")
+    .eq("id", projectId)
     .single();
 
-  if (!siteProject || siteProject.org_id !== profile.org_id) {
-    return { error: "Site not in your organization." };
+  if (geoRes.error && isProjectGeofenceColumnError(geoRes.error.message)) {
+    const base = await supabase.from("projects").select("id, org_id").eq("id", projectId).single();
+    if (base.error || !base.data) return { error: "Project not found." };
+    project = {
+      ...base.data,
+      site_latitude: null,
+      site_longitude: null,
+      site_radius_m: null,
+    };
+  } else if (geoRes.error || !geoRes.data) {
+    return { error: "Project not found." };
+  } else {
+    project = geoRes.data;
   }
 
-  let tokenId: string | null = null;
-  if (token) {
-    const { data: tok } = await supabase
-      .from("site_check_in_tokens")
-      .select("id, site_id, is_active")
-      .eq("token", token)
-      .eq("is_active", true)
-      .maybeSingle();
-    if (!tok || tok.site_id !== siteId) {
-      return { error: "Invalid or inactive check-in code for this site." };
-    }
-    tokenId = tok.id;
+  if (!project) return { error: "Project not found." };
+  if (project.org_id !== profile.org_id) {
+    return { error: "Project not in your organization." };
   }
 
-  const radius = site.geofence_radius_m;
-  if (
-    radius != null &&
-    site.latitude != null &&
-    site.longitude != null &&
-    latitude != null &&
-    longitude != null &&
-    Number.isFinite(latitude) &&
-    Number.isFinite(longitude)
-  ) {
-    const d = distanceMeters(latitude, longitude, site.latitude, site.longitude);
-    if (d > radius) {
+  if (profile.role === "employee" || profile.role === "worker") {
+    const onProject = await employeeMayAccessProject(supabase, profile.person_id, projectId);
+    if (!onProject) {
       return {
-        error: `Outside site geofence (~${Math.round(d)}m from center, limit ${radius}m).`,
+        error:
+          "You are not assigned to this project. Your manager adds people on the project page when you should be on site.",
       };
     }
+  }
+
+  const siteLat = project.site_latitude;
+  const siteLng = project.site_longitude;
+  const radiusM = project.site_radius_m;
+  const geofenceConfigured =
+    siteLat != null && siteLng != null && radiusM != null && Number.isFinite(radiusM) && radiusM > 0;
+
+  if (!geofenceConfigured) {
+    return {
+      error:
+        "This project does not have a work zone on the map yet. Ask a supervisor to open the project and set the site location and radius before you can clock in.",
+    };
+  }
+
+  if (
+    latitude == null ||
+    longitude == null ||
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude)
+  ) {
+    return {
+      error:
+        "This job site requires GPS at clock-in. Allow location access, tap \"Capture GPS\", then try again.",
+    };
+  }
+
+  const distanceM = haversineMeters(latitude, longitude, siteLat, siteLng);
+  if (distanceM > radiusM) {
+    return {
+      error: `You are not within the job site (about ${Math.round(distanceM)} m from the site center; allowed radius is ${Math.round(radiusM)} m).`,
+    };
   }
 
   const { data: open } = await supabase
@@ -96,18 +123,15 @@ export async function clockIn(formData: FormData) {
     return { error: "You already have an open session. Clock out first." };
   }
 
-  const method = tokenId ? "qr" : "self";
-
   const { data: session, error } = await supabase
     .from("attendance_sessions")
     .insert({
       org_id: profile.org_id,
       person_id: profile.person_id,
-      site_id: siteId,
+      project_id: projectId,
       clock_in_lat: latitude,
       clock_in_lng: longitude,
-      method,
-      site_check_in_token_id: tokenId,
+      method: "self",
     })
     .select("id")
     .single();
@@ -115,7 +139,7 @@ export async function clockIn(formData: FormData) {
   if (error) return { error: error.message };
 
   await logAudit(supabase, profile.org_id, profile.id, "clock_in", "attendance_session", session.id, {
-    siteId,
+    projectId,
   });
 
   revalidatePath("/dashboard/check-in");
@@ -138,7 +162,7 @@ export async function clockOut(formData: FormData) {
     .single();
 
   if (!profile?.org_id || !profile.person_id) {
-    return { error: "Not linked to a worker profile." };
+    return { error: "Not linked to an employee profile." };
   }
 
   const latRaw = String(formData.get("latitude") ?? "").trim();
@@ -193,8 +217,8 @@ export async function supervisorClockIn(formData: FormData): Promise<void> {
   if (!["owner", "pm", "supervisor"].includes(profile.role)) return;
 
   const personId = String(formData.get("person_id") ?? "");
-  const siteId = String(formData.get("site_id") ?? "");
-  if (!personId || !siteId) return;
+  const projectId = String(formData.get("project_id") ?? "");
+  if (!personId || !projectId) return;
 
   const { data: person } = await supabase
     .from("people")
@@ -205,21 +229,13 @@ export async function supervisorClockIn(formData: FormData): Promise<void> {
 
   if (!person) return;
 
-  const { data: site } = await supabase
-    .from("sites")
-    .select("id, project_id")
-    .eq("id", siteId)
-    .single();
-
-  if (!site) return;
-
-  const { data: siteProject } = await supabase
+  const { data: project } = await supabase
     .from("projects")
-    .select("org_id")
-    .eq("id", site.project_id)
+    .select("id, org_id")
+    .eq("id", projectId)
     .single();
 
-  if (!siteProject || siteProject.org_id !== profile.org_id) return;
+  if (!project || project.org_id !== profile.org_id) return;
 
   const { data: open } = await supabase
     .from("attendance_sessions")
@@ -235,7 +251,7 @@ export async function supervisorClockIn(formData: FormData): Promise<void> {
     .insert({
       org_id: profile.org_id,
       person_id: personId,
-      site_id: siteId,
+      project_id: projectId,
       method: "supervisor",
       attested_by: profile.id,
     })
@@ -246,7 +262,7 @@ export async function supervisorClockIn(formData: FormData): Promise<void> {
 
   await logAudit(supabase, profile.org_id, profile.id, "clock_in_supervisor", "attendance_session", session.id, {
     personId,
-    siteId,
+    projectId,
   });
 
   revalidatePath("/dashboard/attendance/live");

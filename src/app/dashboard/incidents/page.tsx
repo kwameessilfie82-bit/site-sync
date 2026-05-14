@@ -1,10 +1,8 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { embedOne } from "@/lib/supabase/embed";
-import { createIncident } from "@/actions/incidents";
-import { Button } from "@/ui/primitives/button";
-import { Input } from "@/ui/primitives/input";
-import { Label } from "@/ui/primitives/label";
-import { Textarea } from "@/ui/primitives/textarea";
+import { IncidentReportForm } from "@/components/incident-report-form";
 import {
   Card,
   CardContent,
@@ -18,7 +16,6 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/ui/primitives/empty";
-import { NativeSelect, NativeSelectOption } from "@/ui/primitives/native-select";
 import {
   Table,
   TableBody,
@@ -34,28 +31,27 @@ export default async function IncidentsPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("org_id")
-    .eq("id", user!.id)
+    .select("org_id, role")
+    .eq("id", user.id)
     .single();
 
-  const orgId = profile!.org_id!;
+  if (!profile?.org_id) redirect("/onboarding");
+
+  const orgId = profile.org_id;
+  const isOwner = profile.role === "owner";
 
   const { data: list } = await supabase
     .from("incidents")
-    .select("id, title, severity, created_at, project:projects(name)")
+    .select("id, title, severity, created_at, photo_storage_path, project:projects(name)")
     .eq("org_id", orgId)
     .order("created_at", { ascending: false })
     .limit(100);
 
   const { data: projects } = await supabase.from("projects").select("id, name").eq("org_id", orgId);
-  const projectIds = (projects ?? []).map((p) => p.id);
-  const { data: sites } =
-    projectIds.length > 0
-      ? await supabase.from("sites").select("id, name, project_id").in("project_id", projectIds)
-      : { data: [] as { id: string; name: string; project_id: string }[] };
 
   return (
     <div className="space-y-8">
@@ -66,56 +62,27 @@ export default async function IncidentsPage() {
         </CardHeader>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Report incident</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form action={createIncident} className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="title">Title</Label>
-              <Input id="title" name="title" required placeholder="Missing welding unit" />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea id="description" name="description" rows={4} placeholder="What happened, when, witnesses…" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="severity">Severity</Label>
-              <NativeSelect name="severity" id="severity" defaultValue="low" className="w-full max-w-xs">
-                <NativeSelectOption value="low">Low</NativeSelectOption>
-                <NativeSelectOption value="medium">Medium</NativeSelectOption>
-                <NativeSelectOption value="high">High</NativeSelectOption>
-              </NativeSelect>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="project_id">Project (optional)</Label>
-              <NativeSelect name="project_id" id="project_id" className="w-full max-w-md" defaultValue="">
-                <NativeSelectOption value="">—</NativeSelectOption>
-                {(projects ?? []).map((p) => (
-                  <NativeSelectOption key={p.id} value={p.id}>
-                    {p.name}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="site_id">Site (optional)</Label>
-              <NativeSelect name="site_id" id="site_id" className="w-full max-w-md" defaultValue="">
-                <NativeSelectOption value="">—</NativeSelectOption>
-                {(sites ?? []).map((s) => (
-                  <NativeSelectOption key={s.id} value={s.id}>
-                    {s.name}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            </div>
-            <div className="sm:col-span-2">
-              <Button type="submit">Submit</Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+      {!isOwner ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Report incident</CardTitle>
+            <CardDescription>High severity reports must include a photo.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <IncidentReportForm projects={projects ?? []} />
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Your role</CardTitle>
+            <CardDescription>
+              Owners review every incident below. Open a row for full details. New reports are submitted by PMs,
+              supervisors, and field staff.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
 
       {list && list.length > 0 ? (
         <Card className="overflow-hidden border-border/80 shadow-sm">
@@ -130,6 +97,7 @@ export default async function IncidentsPage() {
                   <TableHead>Title</TableHead>
                   <TableHead>Severity</TableHead>
                   <TableHead>Project</TableHead>
+                  <TableHead>Photo</TableHead>
                   <TableHead>Logged</TableHead>
                 </TableRow>
               </TableHeader>
@@ -140,13 +108,20 @@ export default async function IncidentsPage() {
                   );
                   return (
                     <TableRow key={i.id}>
-                      <TableCell className="font-medium">{i.title}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link href={`/dashboard/incidents/${i.id}`} className="hover:underline">
+                          {i.title}
+                        </Link>
+                      </TableCell>
                       <TableCell>
                         <Badge variant={i.severity === "high" ? "destructive" : "secondary"}>
                           {i.severity}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{project?.name ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {i.photo_storage_path ? "Yes" : "—"}
+                      </TableCell>
                       <TableCell className="tabular-nums text-muted-foreground">
                         {new Date(i.created_at).toLocaleString()}
                       </TableCell>

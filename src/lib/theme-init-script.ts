@@ -1,0 +1,2 @@
+/** Injected by root layout via `next/script` (`beforeInteractive`) — keep in sync with `AppThemeProvider` storage key and class behavior. */
+export const THEME_INIT_SCRIPT = `(function(){try{var k="theme";var t=localStorage.getItem(k);var dark=false;if(t==="dark")dark=true;else if(t==="light")dark=false;else dark=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.classList.toggle("dark",dark);document.documentElement.style.colorScheme=dark?"dark":"light";}catch(e){}})();`;

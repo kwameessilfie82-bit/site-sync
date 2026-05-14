@@ -46,7 +46,7 @@ export default async function TeamPage() {
         <CardHeader>
           <CardTitle className="font-heading text-2xl tracking-tight">Team accounts</CardTitle>
           <CardDescription>
-            Link each login to a person record so workers can use Check in / out for themselves.
+            Link each login to a person record so employees can use Check in / out for themselves.
           </CardDescription>
         </CardHeader>
       </Card>

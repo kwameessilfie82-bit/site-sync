@@ -25,28 +25,43 @@ import { Separator } from "@/ui/primitives/separator";
 import { MapPin } from "lucide-react";
 import { toast } from "sonner";
 
-type SiteOption = { id: string; name: string; project: { name: string } | null };
+type ProjectOption = { id: string; name: string; geofenceConfigured: boolean };
 
 export function CheckInForm({
-  sites,
+  projects,
   openSessionId,
 }: {
-  sites: SiteOption[];
+  projects: ProjectOption[];
   openSessionId: string | null;
 }) {
   const searchParams = useSearchParams();
-  const presetSite = searchParams.get("site") ?? "";
-  const presetToken = searchParams.get("token") ?? "";
-  const [siteId, setSiteId] = useState(presetSite || (sites[0]?.id ?? ""));
+  const presetProject = searchParams.get("project") ?? "";
+  const [projectId, setProjectId] = useState(presetProject || (projects[0]?.id ?? ""));
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
   const [pending, start] = useTransition();
 
   useEffect(() => {
-    if (presetSite) {
-      queueMicrotask(() => setSiteId(presetSite));
+    if (presetProject) {
+      queueMicrotask(() => setProjectId(presetProject));
     }
-  }, [presetSite]);
+  }, [presetProject]);
+
+  const selected = projects.find((p) => p.id === projectId);
+  const geofenceConfigured = !!selected?.geofenceConfigured;
+  const zoneBlocking = !openSessionId && !!selected && !geofenceConfigured;
+
+  useEffect(() => {
+    if (openSessionId || !geofenceConfigured || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLat(String(pos.coords.latitude));
+        setLng(String(pos.coords.longitude));
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 15_000 },
+    );
+  }, [projectId, openSessionId, geofenceConfigured]);
 
   function captureLocation() {
     if (!navigator.geolocation) {
@@ -84,16 +99,16 @@ export function CheckInForm({
     });
   }
 
-  if (sites.length === 0) {
+  if (projects.length === 0) {
     return (
       <Empty className="border border-dashed bg-muted/20">
         <EmptyHeader>
           <EmptyMedia variant="icon">
             <MapPin className="size-4" />
           </EmptyMedia>
-          <EmptyTitle>No sites yet</EmptyTitle>
+          <EmptyTitle>No projects yet</EmptyTitle>
           <EmptyDescription>
-            Create a project and add a site before workers can clock in here.
+            Create a project under Projects before your crew can clock in here.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
@@ -106,8 +121,12 @@ export function CheckInForm({
         <CardTitle className="text-lg">{openSessionId ? "Clock out" : "Clock in"}</CardTitle>
         <CardDescription>
           {openSessionId
-            ? "You have an open session. Capture location if required, then clock out."
-            : "Pick a site and optionally capture GPS for geofenced locations."}
+            ? "You have an open session. Optionally capture GPS, then clock out."
+            : zoneBlocking
+              ? "This project does not have a work zone on the map yet. Ask a supervisor to open the project and save the site before you can clock in here."
+              : geofenceConfigured
+                ? "This project checks GPS at clock-in. Allow location access — we refresh your position when you select the project."
+                : "Pick the project you are on."}
         </CardDescription>
       </CardHeader>
       <Separator />
@@ -127,20 +146,19 @@ export function CheckInForm({
           </form>
         ) : (
           <form onSubmit={submitClockIn} className="space-y-4">
-            <input type="hidden" name="token" value={presetToken} readOnly />
             <div className="space-y-2">
-              <Label htmlFor="site_id">Site</Label>
+              <Label htmlFor="project_id">Project</Label>
               <NativeSelect
-                id="site_id"
-                name="site_id"
+                id="project_id"
+                name="project_id"
                 required
-                value={siteId}
-                onChange={(e) => setSiteId(e.target.value)}
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
                 className="w-full"
               >
-                {sites.map((s) => (
-                  <NativeSelectOption key={s.id} value={s.id}>
-                    {s.project?.name ? `${s.project.name} — ${s.name}` : s.name}
+                {projects.map((p) => (
+                  <NativeSelectOption key={p.id} value={p.id}>
+                    {p.name}
                   </NativeSelectOption>
                 ))}
               </NativeSelect>
@@ -148,10 +166,10 @@ export function CheckInForm({
             <input type="hidden" name="latitude" value={lat} readOnly />
             <input type="hidden" name="longitude" value={lng} readOnly />
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={captureLocation} disabled={pending}>
-                Capture GPS (for geofenced sites)
+              <Button type="button" variant="outline" onClick={captureLocation} disabled={pending || zoneBlocking}>
+                {geofenceConfigured ? "Refresh GPS" : "Capture GPS (optional)"}
               </Button>
-              <Button type="submit" disabled={pending}>
+              <Button type="submit" disabled={pending || zoneBlocking}>
                 {pending ? "Working…" : "Clock in"}
               </Button>
             </div>
@@ -159,7 +177,7 @@ export function CheckInForm({
         )}
       </CardContent>
       <CardFooter className="border-t bg-muted/30 text-xs text-muted-foreground">
-        QR deep links can pre-fill site and token via URL parameters.
+        Links can pre-fill the project with <span className="font-mono">?project=…</span> in the URL.
       </CardFooter>
     </Card>
   );

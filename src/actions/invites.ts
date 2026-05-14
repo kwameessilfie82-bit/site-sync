@@ -2,10 +2,11 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/audit";
+import { PENDING_ORG_INVITE_META_KEY } from "@/lib/invite-metadata";
 import { revalidatePath } from "next/cache";
 import type { UserRole } from "@/types/database";
 
-const invitableRoles: UserRole[] = ["worker", "supervisor", "pm"];
+const invitableRoles: UserRole[] = ["employee", "supervisor", "pm"];
 
 export async function createOrganizationInvite(invitedRole: UserRole) {
   if (!invitableRoles.includes(invitedRole)) {
@@ -62,7 +63,10 @@ export async function acceptOrganizationInvite(token: string) {
 
   if (existing?.org_id) {
     revalidatePath("/", "layout");
-    revalidatePath("/dashboard/people");
+    revalidatePath("/dashboard/invites");
+    await supabase.auth.updateUser({
+      data: { [PENDING_ORG_INVITE_META_KEY]: "" },
+    });
     return { ok: true as const };
   }
 
@@ -74,14 +78,20 @@ export async function acceptOrganizationInvite(token: string) {
     const msg = error.message.toLowerCase();
     if (msg.includes("already belongs")) {
       revalidatePath("/", "layout");
-      revalidatePath("/dashboard/people");
+      revalidatePath("/dashboard/invites");
+      await supabase.auth.updateUser({
+        data: { [PENDING_ORG_INVITE_META_KEY]: "" },
+      });
       return { ok: true as const };
     }
     return { error: error.message };
   }
 
   revalidatePath("/", "layout");
-  revalidatePath("/dashboard/people");
+  revalidatePath("/dashboard/invites");
+  await supabase.auth.updateUser({
+    data: { [PENDING_ORG_INVITE_META_KEY]: "" },
+  });
   return { ok: true as const };
 }
 

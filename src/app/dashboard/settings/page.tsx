@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ProfileSettingsForm } from "@/app/dashboard/settings/profile-settings-form";
@@ -12,6 +13,8 @@ import { Separator } from "@/ui/primitives/separator";
 import { getRbacSummary } from "@/lib/rbac";
 import type { UserRole } from "@/types/database";
 import { Badge } from "@/ui/primitives/badge";
+import { Button } from "@/ui/primitives/button";
+import { ScrollText, UserCog } from "lucide-react";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -23,7 +26,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("display_name, role, org_id, email")
+    .select("display_name, role, org_id, email, person_id, phone")
     .eq("id", user.id)
     .single();
 
@@ -39,6 +42,8 @@ export default async function SettingsPage() {
       : "") ||
     "";
 
+  const initialPhone = profile.phone?.trim() ?? "";
+
   return (
     <div className="mx-auto max-w-lg space-y-8">
       <Card className="border-border/80 shadow-sm">
@@ -51,10 +56,12 @@ export default async function SettingsPage() {
       <Card className="border-border/80 shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">Profile</CardTitle>
-          <CardDescription>Display name is shown in the header, attendance, and audit where relevant.</CardDescription>
+          <CardDescription>
+            Display name and phone are used in the app header and directory where relevant.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <ProfileSettingsForm initialDisplayName={displayName} />
+          <ProfileSettingsForm initialDisplayName={displayName} initialPhone={initialPhone} />
           <Separator />
           <div className="space-y-1 text-sm">
             <p className="text-muted-foreground">Sign-in email</p>
@@ -66,6 +73,35 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
+      {(rbac.canManageTeamAndAudit || role === "owner") && (
+        <Card className="border-border/80 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base">Organization tools</CardTitle>
+            <CardDescription>
+              Less common pages live here so the main sidebar stays focused on day-to-day operations.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            {rbac.canManageTeamAndAudit && (
+              <Button variant="outline" className="justify-start gap-2" asChild>
+                <Link href="/dashboard/audit">
+                  <ScrollText className="size-4" />
+                  Audit log
+                </Link>
+              </Button>
+            )}
+            {role === "owner" && (
+              <Button variant="outline" className="justify-start gap-2" asChild>
+                <Link href="/dashboard/team">
+                  <UserCog className="size-4" />
+                  Team accounts &amp; manual linking
+                </Link>
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="border-border/80 shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">Your access</CardTitle>
@@ -76,23 +112,36 @@ export default async function SettingsPage() {
             <span className="text-muted-foreground">Role</span>
             <Badge variant="secondary">{role}</Badge>
           </div>
+          {profile.person_id ? (
+            <p className="text-xs text-muted-foreground">
+              Your login is linked to a person record — once you are added under People on a project, field logs and
+              check-in unlock for that project.
+            </p>
+          ) : (
+            <p className="text-xs text-amber-800 dark:text-amber-200">
+              A person record will be created automatically when you use the app. If check-in still fails, use Team
+              accounts (owners) to link your login manually.
+            </p>
+          )}
           <p className="leading-relaxed text-muted-foreground">
             {rbac.canManageTeamAndAudit && rbac.canSuperviseFloor && (
               <>
-                You have <span className="font-medium text-foreground">staff</span> access: team accounts,
-                audit log, invites, and all field tools (projects, people, roster, live floor, assets).
+                You have <span className="font-medium text-foreground">staff</span> access: team accounts (from
+                Settings for owners), audit log, invites (including the people directory), and all field tools
+                (projects, project assignments, live attendance).
               </>
             )}
             {rbac.canSuperviseFloor && !rbac.canManageTeamAndAudit && (
               <>
-                You have <span className="font-medium text-foreground">field lead</span> access: projects,
-                people, invites, roster, live on site, and assets. Team accounts and audit are owner/PM only.
+                You have <span className="font-medium text-foreground">field lead</span> access: projects, invites
+                (with people directory), project-level assignments, and live attendance. Team accounts and audit are
+                owner/PM only.
               </>
             )}
-            {rbac.isWorker && (
+            {rbac.isEmployee && (
               <>
-                You have <span className="font-medium text-foreground">worker</span> access: overview,
-                check-in, attendance log, and incidents. Ask an owner or PM if you need a different role.
+                You have <span className="font-medium text-foreground">employee</span> access: after a lead assigns
+                you on a project, you can use field logs, check-in, attendance, and incidents for that work.
               </>
             )}
           </p>

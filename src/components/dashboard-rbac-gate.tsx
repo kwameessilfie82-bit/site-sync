@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { defaultDashboardPath } from "@/lib/dashboard-home";
 import { canAccessDashboardPath } from "@/lib/rbac";
 import type { UserRole } from "@/types/database";
 import { Spinner } from "@/ui/primitives/spinner";
@@ -19,9 +20,12 @@ export function DashboardRbacGate({
 
   useEffect(() => {
     if (!allowed) {
-      router.replace("/dashboard");
+      const fallback = defaultDashboardPath(role);
+      if (pathname !== fallback) {
+        router.replace(fallback);
+      }
     }
-  }, [allowed, router]);
+  }, [allowed, pathname, role, router]);
 
   if (!allowed) {
     return (

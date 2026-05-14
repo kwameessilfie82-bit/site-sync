@@ -1,7 +1,9 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { embedOne } from "@/lib/supabase/embed";
+import { loadProjectsForFieldLogs } from "@/lib/field-log-access";
+import { isProjectGeofenceColumnError } from "@/lib/project-geofence-error";
+import type { UserRole } from "@/types/database";
 import { CheckInForm } from "@/app/dashboard/check-in/check-in-form";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/primitives/alert";
 import { Button } from "@/ui/primitives/button";
@@ -22,23 +24,87 @@ export default async function CheckInPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("org_id, person_id")
+    .select("org_id, person_id, role")
     .eq("id", user!.id)
     .single();
 
   const orgId = profile!.org_id!;
+  const role = profile!.role as UserRole;
 
-  const { data: projects } = await supabase.from("projects").select("id").eq("org_id", orgId);
+  let projects: {
+    id: string;
+    name: string;
+    site_latitude: number | null;
+    site_longitude: number | null;
+    site_radius_m: number | null;
+  }[] = [];
 
-  const projectIds = (projects ?? []).map((p) => p.id);
-  const { data: sites } =
-    projectIds.length > 0
-      ? await supabase
-          .from("sites")
-          .select("id, name, project:projects(name)")
-          .in("project_id", projectIds)
-          .order("name")
-      : { data: [] as { id: string; name: string; project: { name: string } | null }[] };
+  if (role === "employee" || role === "worker") {
+    const assigned = await loadProjectsForFieldLogs(supabase, orgId, role, profile!.person_id);
+    const ids = assigned.map((p) => p.id);
+    if (ids.length > 0) {
+      const geoSel = "id, name, site_latitude, site_longitude, site_radius_m";
+      const { data: rows, error: geoErr } = await supabase
+        .from("projects")
+        .select(geoSel)
+        .in("id", ids)
+        .eq("org_id", orgId)
+        .eq("is_active", true)
+        .order("name");
+      if (geoErr && isProjectGeofenceColumnError(geoErr.message)) {
+        const { data: baseRows } = await supabase
+          .from("projects")
+          .select("id, name")
+          .in("id", ids)
+          .eq("org_id", orgId)
+          .eq("is_active", true)
+          .order("name");
+        projects = (baseRows ?? []).map((p) => ({
+          ...p,
+          site_latitude: null,
+          site_longitude: null,
+          site_radius_m: null,
+        }));
+      } else {
+        projects = rows ?? [];
+      }
+    }
+  } else {
+    const geoSel = "id, name, site_latitude, site_longitude, site_radius_m";
+    const { data: rows, error: geoErr } = await supabase
+      .from("projects")
+      .select(geoSel)
+      .eq("org_id", orgId)
+      .eq("is_active", true)
+      .order("name");
+    if (geoErr && isProjectGeofenceColumnError(geoErr.message)) {
+      const { data: baseRows } = await supabase
+        .from("projects")
+        .select("id, name")
+        .eq("org_id", orgId)
+        .eq("is_active", true)
+        .order("name");
+      projects = (baseRows ?? []).map((p) => ({
+        ...p,
+        site_latitude: null,
+        site_longitude: null,
+        site_radius_m: null,
+      }));
+    } else {
+      projects = rows ?? [];
+    }
+  }
+
+  const projectOptions = projects.map((p) => ({
+    id: p.id,
+    name: p.name,
+    geofenceConfigured:
+      p.site_latitude != null &&
+      p.site_longitude != null &&
+      p.site_radius_m != null &&
+      Number.isFinite(p.site_radius_m) &&
+      p.site_radius_m > 0,
+  }));
 
   let openSessionId: string | null = null;
   if (profile!.person_id) {
@@ -51,22 +117,14 @@ export default async function CheckInPage() {
     openSessionId = open?.id ?? null;
   }
 
-  const siteOptions = (sites ?? []).map((s) => ({
-    id: s.id,
-    name: s.name,
-    project: embedOne(
-      s.project as unknown as { name: string } | { name: string }[] | null,
-    ),
-  }));
-
   return (
     <div className="space-y-8">
       <Card className="border-border/80 shadow-sm">
         <CardHeader>
           <CardTitle className="font-heading text-2xl tracking-tight">Check in / out</CardTitle>
           <CardDescription>
-            Use a site QR link for stronger verification, or pick a site manually. Geofence requires
-            GPS when the site has a radius set.
+            Pick an active project. Self check-in only works once a supervisor has saved a work zone on that
+            project&apos;s page and you are inside it with GPS.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -86,7 +144,7 @@ export default async function CheckInPage() {
       )}
 
       <Suspense fallback={<Card className="animate-pulse border-dashed"><CardContent className="h-40 p-6" /></Card>}>
-        <CheckInForm sites={siteOptions} openSessionId={openSessionId} />
+        <CheckInForm projects={projectOptions} openSessionId={openSessionId} />
       </Suspense>
     </div>
   );

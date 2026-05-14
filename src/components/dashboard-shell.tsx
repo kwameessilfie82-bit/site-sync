@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
-import { Building2, LogIn, LogOut } from "lucide-react";
+import { Building2, LayoutDashboard, LogIn, LogOut, Settings } from "lucide-react";
 import { getDashboardNavItems } from "@/components/dashboard-nav";
+import { shouldShowInMainNav } from "@/lib/rbac";
 import { DashboardRbacGate } from "@/components/dashboard-rbac-gate";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { defaultDashboardPath } from "@/lib/dashboard-home";
 import type { UserRole } from "@/types/database";
 import { Button } from "@/ui/primitives/button";
 import { Badge } from "@/ui/primitives/badge";
@@ -38,23 +40,44 @@ function resolveActiveHref(pathname: string, navItems: { href: string }[]) {
   return matches.reduce((best, item) => (item.href.length > best.href.length ? item : best)).href;
 }
 
+function formatRoleLabel(role: UserRole): string {
+  if (role === "employee" || role === "worker") return "Employee";
+  if (role === "pm") return "Project manager";
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
 export function DashboardShell({
   role,
   orgName,
   displayName,
+  employeePendingAssignment = false,
   children,
 }: {
   role: UserRole;
   orgName: string;
   displayName: string;
+  employeePendingAssignment?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const items = getDashboardNavItems(role);
-  const activeHref = useMemo(
-    () => resolveActiveHref(pathname, getDashboardNavItems(role)),
-    [pathname, role],
-  );
+  const { navItems, logoHref } = useMemo(() => {
+    if (employeePendingAssignment) {
+      return {
+        navItems: [
+          { href: "/dashboard/awaiting-project", label: "Home", icon: LayoutDashboard },
+          { href: "/dashboard/check-in", label: "Check in / out", icon: LogIn },
+          { href: "/dashboard/settings", label: "Settings", icon: Settings },
+        ],
+        logoHref: "/dashboard/awaiting-project",
+      };
+    }
+    return {
+      navItems: getDashboardNavItems(role),
+      logoHref: defaultDashboardPath(role),
+    };
+  }, [employeePendingAssignment, role]);
+
+  const activeHref = useMemo(() => resolveActiveHref(pathname, navItems), [pathname, navItems]);
 
   return (
     <SidebarProvider defaultOpen>
@@ -63,7 +86,7 @@ export function DashboardShell({
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" asChild className="data-active:bg-sidebar-accent">
-                <Link href="/dashboard">
+                <Link href={logoHref}>
                   <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                     <span className="text-xs font-bold">SS</span>
                   </div>
@@ -77,7 +100,7 @@ export function DashboardShell({
           </SidebarMenu>
           <div className="flex flex-wrap items-center gap-2 px-2 pb-1 group-data-[collapsible=icon]:hidden">
             <Badge variant="secondary" className="font-normal">
-              {role}
+              {formatRoleLabel(role)}
             </Badge>
           </div>
         </SidebarHeader>
@@ -86,7 +109,7 @@ export function DashboardShell({
             <SidebarGroupLabel>Workspace</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu className="gap-1">
-                {items.map(({ href, label, icon: Icon }) => {
+                {navItems.map(({ href, label, icon: Icon }) => {
                   const active = href === activeHref;
                   return (
                     <SidebarMenuItem key={href}>
@@ -125,12 +148,15 @@ export function DashboardShell({
             <span className="truncate text-sm font-semibold">Site Sync</span>
             <span className="truncate text-xs text-muted-foreground">{orgName}</span>
           </div>
-          <Button size="sm" className="shrink-0 gap-1.5" asChild>
-            <Link href="/dashboard/check-in">
-              <LogIn className="size-3.5" />
-              Check in
-            </Link>
-          </Button>
+          {(((role === "employee" || role === "worker") && employeePendingAssignment) ||
+            shouldShowInMainNav("/dashboard/check-in", role)) && (
+            <Button size="sm" className="shrink-0 gap-1.5" asChild>
+              <Link href="/dashboard/check-in">
+                <LogIn className="size-3.5" />
+                Check in
+              </Link>
+            </Button>
+          )}
           <ThemeToggle />
         </header>
         <header className="sticky top-0 z-10 hidden min-h-12 shrink-0 flex-wrap items-center justify-end gap-3 border-b bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:flex lg:px-6">

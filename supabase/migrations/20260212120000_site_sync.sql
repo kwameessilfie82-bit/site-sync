@@ -129,7 +129,20 @@ create unique index if not exists one_open_session_per_person
   where clock_out_at is null;
 
 create index if not exists attendance_org_idx on public.attendance_sessions (org_id);
-create index if not exists attendance_site_idx on public.attendance_sessions (site_id);
+-- Baseline migration is re-run by `npm run db:migrate`; later migrations drop `site_id`.
+-- Only create this index when the legacy column still exists.
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns c
+    where c.table_schema = 'public'
+      and c.table_name = 'attendance_sessions'
+      and c.column_name = 'site_id'
+  ) then
+    execute 'create index if not exists attendance_site_idx on public.attendance_sessions (site_id)';
+  end if;
+end $$;
 create index if not exists attendance_clock_in_idx on public.attendance_sessions (clock_in_at desc);
 
 create table if not exists public.audit_events (

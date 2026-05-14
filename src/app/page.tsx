@@ -23,9 +23,9 @@ import { Separator } from "@/ui/primitives/separator";
 const features = [
   {
     icon: MapPin,
-    title: "Sites & geofences",
+    title: "Project-based check-in",
     description:
-      "Define site boundaries and validate clock-ins with GPS when it matters for compliance.",
+      "Clock in on the right project with optional GPS captured for your records.",
   },
   {
     icon: ClipboardCheck,
@@ -37,7 +37,7 @@ const features = [
     icon: RadioTower,
     title: "Live operations",
     description:
-      "See who is on site now across projects — fewer radio checks, fewer surprises.",
+      "See who is clocked in now across projects — fewer radio checks, fewer surprises.",
   },
   {
     icon: Shield,
@@ -73,8 +73,8 @@ export default function HomePage() {
                 Field attendance & accountability
               </Badge>
               <h1 className="font-heading text-balance text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
-                Know who is on which site —{" "}
-                <span className="text-muted-foreground">across every project.</span>
+                Know who is on which project —{" "}
+                <span className="text-muted-foreground">with attendance and logs in one place.</span>
               </h1>
               <p className="mx-auto mt-5 max-w-2xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
                 Construction workforce check-in, multi-project visibility, incidents, and lightweight
@@ -98,7 +98,7 @@ export default function HomePage() {
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     Multi-project
                   </CardTitle>
-                  <CardDescription>Sites, people, and attendance unified per organization.</CardDescription>
+                  <CardDescription>Projects, people, and attendance unified per organization.</CardDescription>
                 </CardHeader>
                 <CardContent className="text-2xl font-semibold tabular-nums tracking-tight">
                   One pane
@@ -109,7 +109,7 @@ export default function HomePage() {
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     Field-ready
                   </CardTitle>
-                  <CardDescription>Token links for sites and optional geofence validation.</CardDescription>
+                  <CardDescription>Optional GPS on clock-in and structured field logs per project.</CardDescription>
                 </CardHeader>
                 <CardContent className="text-2xl font-semibold tabular-nums tracking-tight">
                   QR + GPS
@@ -164,7 +164,7 @@ export default function HomePage() {
           <Card className="mx-auto max-w-4xl overflow-hidden border-border/80 shadow-lg">
             <CardHeader className="gap-2 border-b bg-card px-6 py-8 text-center sm:px-10">
               <CardTitle className="font-heading text-2xl sm:text-3xl">
-                Ready to sync your sites?
+                Ready to sync your operations?
               </CardTitle>
               <CardDescription className="text-base">
                 Create an organization, invite your team, and ship attendance visibility this week.

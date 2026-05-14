@@ -42,9 +42,7 @@ export default async function LiveAttendancePage() {
 
   const { data: open } = await supabase
     .from("attendance_sessions")
-    .select(
-      "id, clock_in_at, person:people(full_name), site:sites(name, project:projects(name))",
-    )
+    .select("id, clock_in_at, person:people(full_name), project:projects(name)")
     .eq("org_id", orgId)
     .is("clock_out_at", null)
     .order("clock_in_at", { ascending: false });
@@ -55,16 +53,12 @@ export default async function LiveAttendancePage() {
     .eq("org_id", orgId)
     .order("full_name");
 
-  const { data: projects } = await supabase.from("projects").select("id").eq("org_id", orgId);
-  const projectIds = (projects ?? []).map((p) => p.id);
-  const { data: sites } =
-    projectIds.length > 0
-      ? await supabase
-          .from("sites")
-          .select("id, name, project:projects(name)")
-          .in("project_id", projectIds)
-          .order("name")
-      : { data: [] as { id: string; name: string; project: { name: string } | null }[] };
+  const { data: projects } = await supabase
+    .from("projects")
+    .select("id, name")
+    .eq("org_id", orgId)
+    .eq("is_active", true)
+    .order("name");
 
   const canSupervise = ["owner", "pm", "supervisor"].includes(profile!.role);
 
@@ -72,8 +66,8 @@ export default async function LiveAttendancePage() {
     <div className="space-y-8">
       <Card className="border-border/80 shadow-sm">
         <CardHeader>
-          <CardTitle className="font-heading text-2xl tracking-tight">Live on site</CardTitle>
-          <CardDescription>Open sessions (not yet clocked out).</CardDescription>
+          <CardTitle className="font-heading text-2xl tracking-tight">Live attendance</CardTitle>
+          <CardDescription>Open sessions by project (not yet clocked out).</CardDescription>
         </CardHeader>
       </Card>
 
@@ -95,18 +89,13 @@ export default async function LiveAttendancePage() {
                 </NativeSelect>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="site_id">Site</Label>
-                <NativeSelect name="site_id" id="site_id" required className="w-full max-w-md">
-                  {(sites ?? []).map((s) => {
-                    const proj = embedOne(
-                      s.project as unknown as { name: string } | { name: string }[] | null,
-                    );
-                    return (
-                      <NativeSelectOption key={s.id} value={s.id}>
-                        {proj ? `${proj.name} — ${s.name}` : s.name}
-                      </NativeSelectOption>
-                    );
-                  })}
+                <Label htmlFor="project_id">Project</Label>
+                <NativeSelect name="project_id" id="project_id" required className="w-full max-w-md">
+                  {(projects ?? []).map((p) => (
+                    <NativeSelectOption key={p.id} value={p.id}>
+                      {p.name}
+                    </NativeSelectOption>
+                  ))}
                 </NativeSelect>
               </div>
               <div className="sm:col-span-2">
@@ -121,14 +110,14 @@ export default async function LiveAttendancePage() {
         <Card className="overflow-hidden border-border/80 shadow-sm">
           <CardHeader className="border-b bg-muted/20">
             <CardTitle className="text-base">Open sessions</CardTitle>
-            <CardDescription>Workers currently clocked in.</CardDescription>
+            <CardDescription>Crew currently clocked in.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50 hover:bg-muted/50">
                   <TableHead>Person</TableHead>
-                  <TableHead>Site</TableHead>
+                  <TableHead>Project</TableHead>
                   <TableHead>Since</TableHead>
                   {canSupervise && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
@@ -138,19 +127,13 @@ export default async function LiveAttendancePage() {
                   const person = embedOne(
                     s.person as unknown as { full_name: string } | { full_name: string }[] | null,
                   );
-                  const site = embedOne(
-                    s.site as unknown as {
-                      name: string;
-                      project: { name: string } | { name: string }[] | null;
-                    } | null,
+                  const project = embedOne(
+                    s.project as unknown as { name: string } | { name: string }[] | null,
                   );
-                  const proj = embedOne(site?.project ?? null)?.name;
                   return (
                     <TableRow key={s.id}>
                       <TableCell className="font-medium">{person?.full_name ?? "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {proj ? `${proj} — ${site?.name}` : site?.name ?? "—"}
-                      </TableCell>
+                      <TableCell className="text-muted-foreground">{project?.name ?? "—"}</TableCell>
                       <TableCell className="tabular-nums text-muted-foreground">
                         {new Date(s.clock_in_at).toLocaleString()}
                       </TableCell>

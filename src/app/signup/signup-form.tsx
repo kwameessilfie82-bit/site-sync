@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { PENDING_ORG_INVITE_META_KEY } from "@/lib/invite-metadata";
+import { getPublicSiteUrlFromClient } from "@/lib/site-url";
+import { PasswordField } from "@/components/password-field";
 import { Button } from "@/ui/primitives/button";
 import {
   CardContent,
@@ -38,17 +41,23 @@ export function SignupForm() {
 
     setLoading(true);
     const supabase = createClient();
-    const origin = window.location.origin;
+    const siteUrl = getPublicSiteUrlFromClient();
+    const trimmedInvite = inviteCode.trim();
     const nextPath =
-      tab === "join" && inviteCode.trim()
-        ? `/onboarding?invite=${encodeURIComponent(inviteCode.trim())}`
+      tab === "join" && trimmedInvite
+        ? `/onboarding?invite=${encodeURIComponent(trimmedInvite)}`
         : "/onboarding";
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
-        data: { display_name: displayName },
+        emailRedirectTo: `${siteUrl}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+        data: {
+          display_name: displayName,
+          ...(tab === "join" && trimmedInvite
+            ? { [PENDING_ORG_INVITE_META_KEY]: trimmedInvite }
+            : {}),
+        },
       },
     });
     setLoading(false);
@@ -119,18 +128,15 @@ export function SignupForm() {
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
+          <PasswordField
+            id="password"
+            label="Password"
+            autoComplete="new-password"
+            required
+            minLength={8}
+            value={password}
+            onChange={setPassword}
+          />
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Creating…" : "Sign up"}
           </Button>
