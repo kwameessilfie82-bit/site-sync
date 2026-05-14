@@ -8,9 +8,18 @@ import type { UserRole } from "@/types/database";
 
 const invitableRoles: UserRole[] = ["employee", "supervisor", "pm"];
 
-export async function createOrganizationInvite(invitedRole: UserRole) {
+export async function createOrganizationInvite(
+  invitedRole: UserRole,
+  options?: { multiUse?: boolean; maxUses?: number | null },
+) {
   if (!invitableRoles.includes(invitedRole)) {
     return { error: "Invalid role for invite." };
+  }
+
+  const multiUse = options?.multiUse === true;
+  const maxUses = multiUse ? (options?.maxUses ?? null) : null;
+  if (maxUses != null && (!Number.isInteger(maxUses) || maxUses < 1)) {
+    return { error: "Max uses must be a positive integer or left empty for unlimited." };
   }
 
   const supabase = await createClient();
@@ -32,6 +41,8 @@ export async function createOrganizationInvite(invitedRole: UserRole) {
 
   const { data: token, error } = await supabase.rpc("create_organization_invite", {
     p_invited_role: invitedRole,
+    p_multi_use: multiUse,
+    p_max_uses: maxUses,
   });
 
   if (error) return { error: error.message };
@@ -39,6 +50,8 @@ export async function createOrganizationInvite(invitedRole: UserRole) {
 
   await logAudit(supabase, profile.org_id, user.id, "create", "organization_invite", null, {
     invitedRole,
+    multiUse,
+    maxUses,
   });
 
   revalidatePath("/dashboard/invites");

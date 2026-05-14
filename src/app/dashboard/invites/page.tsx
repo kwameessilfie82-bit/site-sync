@@ -27,7 +27,9 @@ export default async function InvitesPage() {
 
   const { data: invitesData } = await supabase
     .from("organization_invites")
-    .select("id, token, invited_role, expires_at, used_at, created_at")
+    .select(
+      "id, token, invited_role, expires_at, used_at, created_at, multi_use, max_uses, use_count, last_accepted_at",
+    )
     .eq("org_id", profile.org_id)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -51,6 +53,10 @@ export default async function InvitesPage() {
     expires_at: r.expires_at,
     used_at: r.used_at,
     created_at: r.created_at,
+    multi_use: Boolean(r.multi_use),
+    max_uses: r.max_uses ?? null,
+    use_count: r.use_count ?? 0,
+    last_accepted_at: r.last_accepted_at ?? null,
   }));
 
   const peopleDirectory: PersonDirectoryRow[] = (peopleData ?? []).map((r) => ({
